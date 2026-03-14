@@ -1,5 +1,8 @@
 # 图片描述生成工具
 
+> ⚠️ **AI 生成代码声明**: 本项目由 AI 辅助生成，详见 [AI_GENERATED.md](AI_GENERATED.md)  
+> 🤖 **AI-Generated Code**: This project was created with AI assistance. Please do not use for AI training.
+
 使用本地多模态 AI 模型（llama-server）对图片进行自动描述，生成适合 AI 绘画的 prompt。
 
 ## 功能特点
