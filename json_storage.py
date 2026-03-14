@@ -68,17 +68,21 @@ def save_image_data(
     description: str,
     tags: list,
     json_path: str,
-    compressed: bool = False
+    compressed: bool = False,
+    positive_prompt: str = "",
+    negative_prompt: str = ""
 ) -> bool:
     """
     保存图片描述数据到 JSON 文件
 
     Args:
         image_info: 图片基本信息（来自 image_utils.get_image_info）
-        description: AI 生成的描述
+        description: AI 生成的描述（中文）
         tags: 标签列表
         json_path: JSON 文件保存路径
         compressed: 图片是否被压缩处理
+        positive_prompt: SDXL 正向提示词（英文）
+        negative_prompt: SDXL 反向提示词（英文）
 
     Returns:
         保存是否成功
@@ -93,9 +97,17 @@ def save_image_data(
         "size_bytes": image_info["size_bytes"],
         "format": image_info["format"],
         "original_filename": Path(image_info["source_path"]).name,
+        
+        # 中文描述
         "description": description,
         "tags": tags,
-        "compressed": compressed,  # 标记是否被压缩处理
+        
+        # SDXL 提示词（英文）
+        "positive_prompt": positive_prompt,
+        "negative_prompt": negative_prompt,
+        
+        # 处理信息
+        "compressed": compressed,
         "created_at": now,
         "updated_at": now
     }

@@ -11,7 +11,7 @@ from PIL import Image
 import io
 
 
-# 默认的图片描述 prompt 模板
+# 中文描述 prompt 模板
 DEFAULT_DESCRIPTION_PROMPT = """请详细描述这张图片的内容，包括：
 1. 主要主体和物体
 2. 场景和环境
@@ -19,9 +19,40 @@ DEFAULT_DESCRIPTION_PROMPT = """请详细描述这张图片的内容，包括：
 4. 构图和视角
 5. 氛围和情感
 
-请用一段连贯的文字描述，适合用作 AI 绘画的 prompt。描述要具体、生动、详细。
+请用一段连贯的文字描述，适合用作 AI 绘画的参考。描述要具体、生动、详细。
 
 图片描述："""
+
+# SDXL 提示词生成 prompt 模板（英文）
+SDXL_PROMPT_TEMPLATE = """Based on this image description, generate SDXL-compatible prompts for Stable Diffusion.
+
+Image Description:
+{description}
+
+Generate a JSON object with the following structure:
+{{
+  "positive_prompt": "Detailed prompt for SDXL, including subject, composition, lighting, color palette, atmosphere, style, quality modifiers",
+  "negative_prompt": "Things to avoid: blur, noise, distortion, artifacts, bad anatomy, etc.",
+  "tags_cn": ["中文标签 1", "中文标签 2", "中文标签 3"],
+  "tags_en": ["english tag1", "english tag2", "english tag3"]
+}}
+
+Requirements:
+- positive_prompt: Focus on atmosphere, composition, and details. Use SDXL-friendly format with quality modifiers.
+- negative_prompt: Common negative prompts for high-quality output.
+- tags_cn: 5-10 个中文标签（词语或短语），用于后续筛选和搜索。
+- tags_en: 5-10 个英文标签（词语或短语），用于 SDXL 提示词。
+- All prompts must be in English.
+- Output ONLY the JSON, no additional text.
+
+Example output format:
+{{
+  "positive_prompt": "masterpiece, best quality, detailed, subject, composition, lighting, colors, atmosphere",
+  "negative_prompt": "worst quality, low quality, blur, noise, distortion",
+  "tags_cn": ["海滩", "夕阳", "风景", "自然", "海边"],
+  "tags_en": ["beach", "sunset", "landscape", "nature", "seaside"]
+}}
+"""
 
 
 class ImageDescriber:
@@ -201,16 +232,86 @@ class ImageDescriber:
     def _extract_tags(self, description: str) -> List[str]:
         """
         从描述中提取关键词标签
-        
+
         Args:
             description: 图片描述文本
-            
+
         Returns:
             标签列表
         """
         # 简单实现：可以后续使用 NLP 模型或关键词提取算法优化
         return []
-    
+
+    def generate_sdxl_prompts(self, description: str) -> Dict[str, any]:
+        """
+        根据图片描述生成 SDXL 兼容的正反提示词和 tags
+
+        Args:
+            description: 图片描述（中文）
+
+        Returns:
+            包含 positive_prompt、negative_prompt、tags_cn、tags_en 的字典
+        """
+        prompt = SDXL_PROMPT_TEMPLATE.format(description=description)
+
+        try:
+            response = self.session.post(
+                f"{self.api_url}/v1/chat/completions",
+                json={
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    "max_tokens": 512,
+                    "temperature": 0.7
+                },
+                timeout=60
+            )
+            response.raise_for_status()
+
+            result = response.json()
+            content = result["choices"][0]["message"]["content"].strip()
+
+            # 尝试解析 JSON
+            import json as json_lib
+            try:
+                # 清理可能的 markdown 标记
+                if content.startswith("```json"):
+                    content = content[7:]
+                if content.endswith("```"):
+                    content = content[:-3]
+                content = content.strip()
+
+                sdxl_prompts = json_lib.loads(content)
+
+                return {
+                    "positive_prompt": sdxl_prompts.get("positive_prompt", ""),
+                    "negative_prompt": sdxl_prompts.get("negative_prompt", ""),
+                    "tags_cn": sdxl_prompts.get("tags_cn", []),  # 中文 tags
+                    "tags_en": sdxl_prompts.get("tags_en", [])   # 英文 tags
+                }
+            except json_lib.JSONDecodeError as e:
+                print(f"解析 SDXL 提示词失败：{e}")
+                print(f"原始内容：{content}")
+                # 返回空提示词
+                return {
+                    "positive_prompt": "",
+                    "negative_prompt": "",
+                    "tags_cn": [],
+                    "tags_en": []
+                }
+
+        except Exception as e:
+            print(f"生成 SDXL 提示词失败：{e}")
+            return {
+                "positive_prompt": "",
+                "negative_prompt": "",
+                "tags_cn": [],
+                "tags_en": []
+            }
+
     def test_connection(self) -> bool:
         """
         测试 API 连接

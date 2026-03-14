@@ -127,12 +127,24 @@ JSON 文件使用图片的 **MD5 哈希值**命名：`{md5}.json`
   "height": 1080,
   "size_bytes": 524288,
   "format": "JPEG",
+  
   "description": "一张夕阳下的海滩照片，金色的阳光洒在海面上...",
   "tags": ["海滩", "夕阳", "风景"],
+  
+  "positive_prompt": "masterpiece, best quality, detailed, sunset beach, golden light...",
+  "negative_prompt": "worst quality, low quality, blur, noise, distortion...",
+  
+  "compressed": false,
   "created_at": "2026-03-14T10:30:00",
   "updated_at": "2026-03-14T10:30:00"
 }
 ```
+
+**字段说明**：
+- `description`: 中文描述，用于人工阅读和理解
+- `positive_prompt`: SDXL 英文正向提示词，可直接用于 Fooocus/Stable Diffusion
+- `negative_prompt`: SDXL 英文反向提示词，过滤低质量输出
+- `compressed`: 标记图片是否被压缩处理（大图片自动压缩）
 
 ## 配置说明
 

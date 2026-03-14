@@ -28,9 +28,9 @@ class ImageDescriberApp(ctk.CTk):
         super().__init__()
 
         # 窗口配置
-        self.title("图片描述生成工具")
-        self.geometry("1000x750")
-        self.minsize(850, 650)
+        self.title("图片描述生成工具 - SDXL 提示词生成器")
+        self.geometry("1400x900")
+        self.minsize(1200, 800)
 
         # 设置主题
         ctk.set_appearance_mode("dark")
@@ -111,32 +111,39 @@ class ImageDescriberApp(ctk.CTk):
         selection_frame.grid(row=row, column=0, sticky="ew", padx=10, pady=5)
         selection_frame.grid_columnconfigure(1, weight=1)
 
-        self.btn_select_image = ctk.CTkButton(
+        # 选择模式下拉框 - 使用中文显示
+        ctk.CTkLabel(selection_frame, text="选择方式:", width=70).grid(row=0, column=0, padx=(0, 5), pady=5)
+        
+        self.selection_mode_var = ctk.StringVar(value="dir")  # 默认选择目录
+        self.combo_selection_mode = ctk.CTkComboBox(
             selection_frame,
-            text="📁 选择图片",
-            command=self._select_images,
-            width=120
+            values=["single", "multi", "dir"],
+            variable=self.selection_mode_var,
+            command=self._on_selection_mode_changed,
+            width=150
         )
-        self.btn_select_image.grid(row=0, column=0, padx=(0, 10), pady=5)
+        self.combo_selection_mode.grid(row=0, column=1, padx=(0, 10), pady=5, sticky="w")
+        # 设置默认显示文字
+        self.combo_selection_mode.set("📂 选择目录")
+        
+        # 模式说明标签
+        self.lbl_mode_hint = ctk.CTkLabel(
+            selection_frame,
+            text="📂 选择目录",
+            text_color="#4da6ff",
+            width=100
+        )
+        self.lbl_mode_hint.grid(row=0, column=2, padx=(0, 10), pady=5, sticky="w")
 
-        self.btn_select_dir = ctk.CTkButton(
+        # 选择按钮
+        self.btn_select = ctk.CTkButton(
             selection_frame,
             text="📂 选择目录",
             command=self._select_directory,
-            width=120
+            width=120,
+            height=32
         )
-        self.btn_select_dir.grid(row=0, column=1, padx=(0, 10), pady=5, sticky="w")
-
-        # 历史目录选择
-        self.image_dir_var = ctk.StringVar(value="")
-        self.combo_image_dir = ctk.CTkComboBox(
-            selection_frame,
-            values=self.config.get("image_dirs", []),
-            variable=self.image_dir_var,
-            command=self._on_image_dir_selected
-        )
-        self.combo_image_dir.grid(row=0, column=2, sticky="ew", padx=(10, 10))
-        self.combo_image_dir.set("选择历史目录..." if self.config.get("image_dirs") else "无历史记录")
+        self.btn_select.grid(row=0, column=3, padx=(0, 10), pady=5)
 
         self.lbl_selection_info = ctk.CTkLabel(
             selection_frame,
@@ -144,7 +151,7 @@ class ImageDescriberApp(ctk.CTk):
             text_color="gray",
             anchor="w"
         )
-        self.lbl_selection_info.grid(row=1, column=0, columnspan=3, sticky="w", pady=2)
+        self.lbl_selection_info.grid(row=1, column=0, columnspan=4, sticky="w", pady=2)
 
     def _create_output_section(self, row: int):
         """输出目录区域"""
@@ -378,20 +385,66 @@ class ImageDescriberApp(ctk.CTk):
             )
             # 添加到历史记录
             self._add_to_history(self.config["image_dirs"], directory)
-            self._update_combo_box(self.combo_image_dir, self.config["image_dirs"])
-            self.image_dir_var.set(directory)
             self._save_config()
             self._log_result(f"✓ 从目录加载 {len(self.selected_images)} 张图片：{directory}")
 
-    def _on_image_dir_selected(self, event=None):
-        """从历史中选择目录"""
-        directory = self.image_dir_var.get()
-        if directory and directory != "选择历史目录..." and directory != "无历史记录":
+    def _on_selection_mode_changed(self, event=None):
+        """选择模式切换"""
+        mode = self.selection_mode_var.get()
+        
+        if mode == "single":
+            self.btn_select.configure(text="📁 选择单张图片", command=self._select_single_image)
+            self.lbl_mode_hint.configure(text="📁 选择单张图片")
+            self.combo_selection_mode.set("📁 选择单张图片")
+        elif mode == "multi":
+            self.btn_select.configure(text="📁 选择多张图片", command=self._select_multi_images)
+            self.lbl_mode_hint.configure(text="📁 选择多张图片")
+            self.combo_selection_mode.set("📁 选择多张图片")
+        else:  # dir
+            self.btn_select.configure(text="📂 选择目录", command=self._select_directory)
+            self.lbl_mode_hint.configure(text="📂 选择目录")
+            self.combo_selection_mode.set("📂 选择目录")
+
+    def _select_single_image(self):
+        """选择单张图片"""
+        file = filedialog.askopenfilename(
+            title="选择单张图片",
+            filetypes=[
+                ("图片文件", "*.jpg *.jpeg *.png *.webp *.bmp *.gif"),
+                ("所有文件", "*.*")
+            ]
+        )
+        if file:
+            self.selected_images = [file]
+            self.lbl_selection_info.configure(text=f"已选择 1 张图片：{Path(file).name}")
+            self._log_result(f"✓ 已选择 1 张图片：{Path(file).name}")
+
+    def _select_multi_images(self):
+        """选择多张图片"""
+        files = filedialog.askopenfilenames(
+            title="选择多张图片",
+            filetypes=[
+                ("图片文件", "*.jpg *.jpeg *.png *.webp *.bmp *.gif"),
+                ("所有文件", "*.*")
+            ]
+        )
+        if files:
+            self.selected_images = list(files)
+            self.lbl_selection_info.configure(text=f"已选择 {len(files)} 张图片")
+            self._log_result(f"✓ 已选择 {len(files)} 张图片")
+
+    def _select_directory(self):
+        """选择目录"""
+        directory = filedialog.askdirectory(title="选择图片目录")
+        if directory:
             self.selected_images = get_images_from_directory(directory)
             self.lbl_selection_info.configure(
                 text=f"目录：{directory} ({len(self.selected_images)} 张图片)"
             )
-            self._log_result(f"✓ 从历史目录加载 {len(self.selected_images)} 张图片：{directory}")
+            # 添加到历史记录
+            self._add_to_history(self.config["image_dirs"], directory)
+            self._save_config()
+            self._log_result(f"✓ 从目录加载 {len(self.selected_images)} 张图片：{directory}")
 
     def _browse_output_dir(self):
         """浏览输出目录"""
@@ -478,8 +531,7 @@ class ImageDescriberApp(ctk.CTk):
         # 更新 UI 状态
         self.btn_start.configure(state="disabled")
         self.btn_stop.configure(state="normal")
-        self.btn_select_image.configure(state="disabled")
-        self.btn_select_dir.configure(state="disabled")
+        self.btn_select.configure(state="disabled")
         self.progress_bar.set(0)
 
         # 创建并启动处理线程
@@ -540,8 +592,7 @@ class ImageDescriberApp(ctk.CTk):
         """处理完成"""
         self.btn_start.configure(state="normal")
         self.btn_stop.configure(state="disabled")
-        self.btn_select_image.configure(state="normal")
-        self.btn_select_dir.configure(state="normal")
+        self.btn_select.configure(state="normal")
         self.lbl_progress.configure(text="处理完成")
         self._log_result("✓ 所有图片处理完成")
 

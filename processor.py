@@ -143,24 +143,39 @@ class ImageProcessor:
                 if self.duplicate_strategy == "skip":
                     return ProcessingStatus.SKIPPED, existing_data
                 # overwrite: 继续处理
-            
+
             # 生成描述
             result = self.describer.describe_image(image_path)
+
+            # 生成 SDXL 提示词（英文）- 包含中文和英文 tags
+            sdxl_result = self.describer.generate_sdxl_prompts(result["description"])
+
+            # 合并 tags：中文 tags（主要）+ 英文 tags（辅助）
+            cn_tags = sdxl_result.get("tags_cn", [])
+            en_tags = sdxl_result.get("tags_en", [])
+            # 优先使用中文 tags，如果没有则用英文 tags
+            merged_tags = cn_tags if cn_tags else en_tags
 
             # 保存数据
             save_image_data(
                 image_info=image_info,
                 description=result["description"],
-                tags=result["tags"],
+                tags=merged_tags,
                 json_path=json_path,
-                compressed=result.get("compressed", False)
+                compressed=result.get("compressed", False),
+                positive_prompt=sdxl_result.get("positive_prompt", ""),
+                negative_prompt=sdxl_result.get("negative_prompt", "")
             )
 
             data = {
                 **image_info,
                 "description": result["description"],
-                "tags": result["tags"],
+                "tags": merged_tags,
+                "tags_cn": cn_tags,
+                "tags_en": en_tags,
                 "compressed": result.get("compressed", False),
+                "positive_prompt": sdxl_result.get("positive_prompt", ""),
+                "negative_prompt": sdxl_result.get("negative_prompt", ""),
                 "json_path": json_path
             }
             
